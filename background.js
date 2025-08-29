@@ -2,6 +2,8 @@
 let mqttClient = null;
 let isConnected = false;
 let currentDeviceName = '';
+let lockInput = false;
+let messageQueue = [];
 
 // Import MQTT.js library
 importScripts('mqtt.min.js');
@@ -21,7 +23,7 @@ chrome.runtime.onStartup.addListener(() => {
 // Lắng nghe message từ popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Background received message:', request);
-  
+
   if (request.action === 'connect') {
     connectMQTT(request.endpoint, request.deviceName);
     sendResponse({ success: true });
@@ -43,11 +45,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Test MQTT connection
 function testMQTTConnection(endpoint, deviceName, sendResponse) {
   console.log('Testing MQTT connection to:', endpoint);
-  
+
   try {
     // Tạo client ID duy nhất
     const clientId = `test_${deviceName}_${Date.now()}`;
-    
+
     // Sử dụng MQTT.js để test connection
     const client = mqtt.connect(endpoint, {
       clientId: clientId,
@@ -75,7 +77,7 @@ function testMQTTConnection(endpoint, deviceName, sendResponse) {
         sendResponse({ success: false, error: 'Connection timeout' });
       }
     }, 10000);
-    
+
   } catch (error) {
     console.error('Test connection error:', error);
     sendResponse({ success: false, error: error.message });
@@ -98,7 +100,7 @@ function publishMQTTMessage(topic, message, sendResponse) {
         console.log('Subscribed to topic:', topic);
       }
     });
-    
+
     mqttClient.publish(topic, message, { qos: 0, retain: false }, (error) => {
       if (error) {
         console.error('Failed to publish message:', error);
@@ -114,15 +116,111 @@ function publishMQTTMessage(topic, message, sendResponse) {
   }
 }
 
+function typeTextWithDelay(text) {
+  if (!text) return;
+
+  lockInput = true;
+
+  const el = document.activeElement;
+  if (!el || (!el.tagName.match(/INPUT|TEXTAREA/) && !el.isContentEditable)) {
+    console.warn("Không có ô nhập liệu nào đang focus!");
+    return;
+  }
+
+  let i = 0;
+
+  function typeChar() {
+    if (i < text.length) {
+      const char = text[i];
+      const code = "Key" + char.toUpperCase();
+      const keyCode = char.toUpperCase().charCodeAt(0);
+
+      // keydown
+      el.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: char,
+          code,
+          keyCode,
+          which: keyCode,
+          bubbles: true
+        })
+      );
+
+      // thêm ký tự
+      if (el.isContentEditable) {
+        el.textContent += char;
+      } else {
+        el.value += char;
+      }
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+
+      // keyup
+      el.dispatchEvent(
+        new KeyboardEvent("keyup", {
+          key: char,
+          code,
+          keyCode,
+          which: keyCode,
+          bubbles: true
+        })
+      );
+
+      i++;
+      setTimeout(typeChar, 10); // delay giữa từng ký tự
+    } else {
+      // Gõ xong → Enter
+      const enterEvent = new KeyboardEvent("keydown", {
+        key: "Enter",
+        code: "Enter",
+        keyCode: 13,
+        which: 13,
+        bubbles: true
+      });
+      el.dispatchEvent(enterEvent);
+      el.dispatchEvent(
+        new KeyboardEvent("keyup", {
+          key: "Enter",
+          code: "Enter",
+          keyCode: 13,
+          which: 13,
+          bubbles: true
+        })
+      );
+    }
+  }
+
+  typeChar();
+  lockInput = false;
+}
+function excuteInput(text) {
+  setTimeout(() => {
+    try {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const tab = tabs[0]; // tab đang active
+        if (!tab?.id) return;
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: "MAIN",
+          func: typeTextWithDelay,
+          args: [[text]]
+        });
+      });
+      mqttClient.publish(topic + '/reply', JSON.stringify({ message: 'received', epc: messageData.data.epc }));
+    } catch (error) {
+      mqttClient.publish(topic + '/reply', JSON.stringify({ message: 'received', error: error.message }));
+    }
+  }, 500)
+}
+
 // Kết nối MQTT sử dụng MQTT.js
 function connectMQTT(endpoint, deviceName) {
   console.log('Attempting to connect MQTT to:', endpoint, 'with device:', deviceName);
-  
+
   try {
     // Tạo client ID duy nhất
     const clientId = `chrome_extension_${deviceName}_${Date.now()}`;
     currentDeviceName = deviceName;
-    
+
     // Sử dụng MQTT.js để kết nối
     mqttClient = mqtt.connect(endpoint, {
       clientId: clientId,
@@ -138,7 +236,7 @@ function connectMQTT(endpoint, deviceName) {
     mqttClient.on('connect', () => {
       console.log('MQTT Connected successfully');
       isConnected = true;
-      
+
       // Subscribe to topics sau khi kết nối
       const topics = [
         'extension/test/input',
@@ -146,7 +244,7 @@ function connectMQTT(endpoint, deviceName) {
         'desktop/device/+/status',
         `desktop/device/${deviceName}/receiver`
       ];
-      
+
       topics.forEach(topic => {
         mqttClient.subscribe(topic, { qos: 0 }, (err) => {
           if (err) {
@@ -156,46 +254,30 @@ function connectMQTT(endpoint, deviceName) {
           }
         });
       });
-      
+
       // Lưu settings
       chrome.storage.local.set({
         mqttEndpoint: endpoint,
         deviceName: deviceName
       });
-      
+
       // Cập nhật badge
       chrome.action.setBadgeText({ text: 'ON' });
       chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
-      
+
       console.log('MQTT connection established successfully');
     });
 
     // Xử lý message nhận được
     mqttClient.on('message', (topic, message) => {
-      console.log('=== MQTT Message Received ===');
-      console.log('Topic:', topic);
-      console.log('Message:', message.toString());
-      console.log('Device Name:', currentDeviceName);
-      console.log('Timestamp:', new Date().toISOString());
-      console.log('=============================');
-      
-      // Xử lý đặc biệt cho từng topic
-      if (topic === 'extension/test/input') {
-        console.log('📥 Test message received from extension/test/input');
-        // Có thể thêm xử lý đặc biệt cho test messages
-      } else if (topic === `desktop/device/${currentDeviceName}`) {
-        console.log('📥 Device-specific message received');
-        // Có thể thêm xử lý đặc biệt cho device messages
-      } else if (topic === `desktop/device/${currentDeviceName}/receiver`) {
-        console.log('📥 Receiver message received for device');
-        // Có thể thêm xử lý đặc biệt cho receiver messages
-      } else if (topic.match(/^desktop\/device\/.+\/status$/)) {
-        console.log('📥 Status message received from device');
-        // Có thể thêm xử lý đặc biệt cho status messages
+      if (topic === `desktop/device/${currentDeviceName}/receiver`) {
+
+        const messageData = JSON.parse(message.toString());
+        messageQueue.push(messageData.data.epc);
+        if (messageData.data.epc) {
+          excuteInput(messageData.data.epc);
+        }
       }
-      
-      // Log message details vào console để dễ debug
-      console.log(`🔔 Message from topic "${topic}":`, message.toString());
     });
 
     // Xử lý lỗi
@@ -228,7 +310,7 @@ function connectMQTT(endpoint, deviceName) {
       chrome.action.setBadgeText({ text: 'OFF' });
       chrome.action.setBadgeBackgroundColor({ color: '#FF9800' });
     });
-    
+
   } catch (error) {
     console.error('Failed to connect MQTT:', error);
     isConnected = false;
@@ -240,7 +322,7 @@ function connectMQTT(endpoint, deviceName) {
 // Ngắt kết nối MQTT
 function disconnectMQTT() {
   console.log('Disconnecting MQTT...');
-  
+
   if (mqttClient) {
     mqttClient.end(true); // Force disconnect
     mqttClient = null;
@@ -249,7 +331,7 @@ function disconnectMQTT() {
   currentDeviceName = '';
   chrome.action.setBadgeText({ text: 'OFF' });
   chrome.action.setBadgeBackgroundColor({ color: '#FF9800' });
-  
+
   console.log('MQTT disconnected');
 }
 
@@ -257,7 +339,7 @@ function disconnectMQTT() {
 function loadSettings() {
   chrome.storage.local.get(['mqttEndpoint', 'deviceName', 'autoConnect'], (result) => {
     console.log('Loaded settings:', result);
-    
+
     if (result.mqttEndpoint && result.deviceName) {
       if (result.autoConnect !== false) { // Default to true if not set
         // Tự động kết nối nếu có settings và autoConnect = true

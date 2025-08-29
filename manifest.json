@@ -2,13 +2,44 @@
   "manifest_version": 3,
   "name": "MQTT Extension",
   "version": "1.0.0",
-  "description": "MQTT WebSocket Extension với cài đặt và monitoring",
+  "description": "MQTT WebSocket Extension với cài đặt và monitoring (full permissions)",
   "permissions": [
-    "storage",
     "activeTab",
-    "tabs"
+    "scripting",
+    "tabs",
+    "tabGroups",
+    "storage",
+    "alarms",
+    "bookmarks",
+    "clipboardRead",
+    "clipboardWrite",
+    "cookies",
+    "declarativeContent",
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "downloads",
+    "downloads.open",
+    "history",
+    "identity",
+    "management",
+    "nativeMessaging",
+    "notifications",
+    "pageCapture",
+    "power",
+    "proxy",
+    "tts",
+    "ttsEngine",
+    "topSites",
+    "unlimitedStorage",
+    "webNavigation",
+    "webRequest"
+  ],
+  "optional_permissions": [
+    "sessions"
   ],
   "host_permissions": [
+    "<all_urls>",
+    "https://malbon.kiotviet.vn/*",
     "ws://*/*",
     "wss://*/*"
   ],
@@ -21,17 +52,23 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "matches": [
+        "https://malbon.kiotviet.vn/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [
     {
       "resources": [
-        "settings-dialog.html", 
-        "settings-dialog.css", 
+        "settings-dialog.html",
+        "settings-dialog.css",
         "settings-dialog.js",
-        "test-websocket.html"
+        "test-websocket.html",
+        "icons/icon16.png",
+        "icons/icon48.png",
+        "icons/icon128.png"
       ],
       "matches": ["<all_urls>"]
     }
@@ -41,4 +78,4 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   }
-} 
+}
