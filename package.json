@@ -15,6 +15,7 @@
   ],
   "author": "Your Name",
   "license": "MIT",
-  "devDependencies": {},
-  "dependencies": {}
-} 
+  "dependencies": {
+    "mqtt": "^5.14.0"
+  }
+}
