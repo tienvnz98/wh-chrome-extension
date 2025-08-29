@@ -4,6 +4,9 @@ let isConnected = false;
 let currentDeviceName = '';
 let lockInput = false;
 let messageQueue = [];
+let activeTabs = new Map(); // Track active tabs
+let lastReloadTime = 0;
+const RELOAD_COOLDOWN = 5000; // 5 seconds cooldown between reloads
 
 // Import MQTT.js library
 importScripts('mqtt.min.js');
@@ -20,7 +23,7 @@ chrome.runtime.onStartup.addListener(() => {
   loadSettings();
 });
 
-// Lắng nghe message từ popup
+// Lắng nghe message từ popup và content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Background received message:', request);
 
@@ -38,9 +41,164 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === 'publishMessage') {
     publishMQTTMessage(request.topic, request.message, sendResponse);
     return true;
+  } else if (request.action === 'contentScriptLoaded') {
+    handleContentScriptLoaded(request, sender);
+    sendResponse({ success: true });
+  } else if (request.action === 'pageVisible') {
+    handlePageVisible(request, sender);
+    sendResponse({ success: true });
+  } else if (request.action === 'windowFocused') {
+    handleWindowFocused(request, sender);
+    sendResponse({ success: true });
+  } else if (request.action === 'reloadExtension') {
+    reloadExtension();
+    sendResponse({ success: true });
   }
   return true;
 });
+
+// Xử lý khi content script được load
+function handleContentScriptLoaded(request, sender) {
+  console.log('Content script loaded on:', request.url, 'from tab:', sender.tab?.id);
+  
+  if (sender.tab) {
+    activeTabs.set(sender.tab.id, {
+      url: request.url,
+      timestamp: request.timestamp,
+      active: true
+    });
+    
+    // Kiểm tra nếu đây là trang KiotViet và extension cần reload
+    if (request.url.includes('malbon.kiotviet.vn') && shouldReloadExtension()) {
+      console.log('KiotViet page detected, considering extension reload...');
+      scheduleExtensionReload();
+    }
+  }
+}
+
+// Xử lý khi page trở nên visible
+function handlePageVisible(request, sender) {
+  console.log('Page became visible:', request.url, 'from tab:', sender.tab?.id);
+  
+  if (sender.tab && request.url.includes('malbon.kiotviet.vn')) {
+    console.log('KiotViet page became visible, checking extension state...');
+    
+    // Kiểm tra state của extension
+    if (!isConnected || mqttClient === null) {
+      console.log('Extension state issue detected, attempting to reload...');
+      scheduleExtensionReload();
+    }
+  }
+}
+
+// Xử lý khi window được focus
+function handleWindowFocused(request, sender) {
+  console.log('Window focused on:', request.url, 'from tab:', sender.tab?.id);
+  
+  if (sender.tab && request.url.includes('malbon.kiotviet.vn')) {
+    console.log('KiotViet window focused, checking extension health...');
+    
+    // Kiểm tra health của extension
+    checkExtensionHealth();
+  }
+}
+
+// Kiểm tra health của extension
+function checkExtensionHealth() {
+  const now = Date.now();
+  
+  // Kiểm tra nếu MQTT client bị lỗi
+  if (mqttClient && mqttClient.connected === false && isConnected) {
+    console.log('MQTT client state mismatch detected, fixing...');
+    isConnected = false;
+    updateBadge('ERR', '#F44336');
+  }
+  
+  // Kiểm tra nếu cần reload extension
+  if (shouldReloadExtension()) {
+    console.log('Extension health check failed, scheduling reload...');
+    scheduleExtensionReload();
+  }
+}
+
+// Kiểm tra xem có nên reload extension không
+function shouldReloadExtension() {
+  const now = Date.now();
+  
+  // Kiểm tra cooldown
+  if (now - lastReloadTime < RELOAD_COOLDOWN) {
+    return false;
+  }
+  
+  // Kiểm tra các điều kiện cần reload
+  if (!mqttClient && isConnected) return true;
+  if (mqttClient && mqttClient.connected === false && isConnected) return true;
+  if (mqttClient && mqttClient.connected === true && !isConnected) return true;
+  
+  return false;
+}
+
+// Lên lịch reload extension
+function scheduleExtensionReload() {
+  const now = Date.now();
+  
+  if (now - lastReloadTime < RELOAD_COOLDOWN) {
+    console.log('Reload cooldown active, skipping...');
+    return;
+  }
+  
+  console.log('Scheduling extension reload...');
+  lastReloadTime = now;
+  
+  // Disconnect trước
+  if (mqttClient) {
+    disconnectMQTT();
+  }
+  
+  // Reload sau 1 giây
+  setTimeout(() => {
+    console.log('Executing extension reload...');
+    reloadExtension();
+  }, 1000);
+}
+
+// Reload extension
+function reloadExtension() {
+  console.log('Reloading extension...');
+  
+  try {
+    // Disconnect MQTT nếu đang kết nối
+    if (mqttClient) {
+      disconnectMQTT();
+    }
+    
+    // Reset state
+    isConnected = false;
+    currentDeviceName = '';
+    messageQueue = [];
+    lockInput = false;
+    
+    // Update badge
+    updateBadge('OFF', '#FF9800');
+    
+    // Load settings và auto-connect
+    loadSettings();
+    
+    console.log('Extension reloaded successfully');
+  } catch (error) {
+    console.error('Error during extension reload:', error);
+  }
+}
+
+// Update badge với text và color
+function updateBadge(text, color) {
+  try {
+    chrome.action.setBadgeText({ text: text });
+    chrome.action.setBadgeBackgroundColor({ color: color });
+  } catch (error) {
+    console.error('Error updating badge:', error);
+  }
+}
 
 // Test MQTT connection
 function testMQTTConnection(endpoint, deviceName, sendResponse) {
@@ -116,100 +274,58 @@ function publishMQTTMessage(topic, message, sendResponse) {
   }
 }
 
-function typeTextWithDelay(text) {
-  if (!text) return;
-
-  lockInput = true;
-
-  const el = document.activeElement;
-  if (!el || (!el.tagName.match(/INPUT|TEXTAREA/) && !el.isContentEditable)) {
-    console.warn("Không có ô nhập liệu nào đang focus!");
+// Function để gõ text vào active tab
+function executeInput(text) {
+  if (!text) {
+    console.warn('No text to type');
     return;
   }
 
-  let i = 0;
-
-  function typeChar() {
-    if (i < text.length) {
-      const char = text[i];
-      const code = "Key" + char.toUpperCase();
-      const keyCode = char.toUpperCase().charCodeAt(0);
-
-      // keydown
-      el.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: char,
-          code,
-          keyCode,
-          which: keyCode,
-          bubbles: true
-        })
-      );
-
-      // thêm ký tự
-      if (el.isContentEditable) {
-        el.textContent += char;
-      } else {
-        el.value += char;
-      }
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-
-      // keyup
-      el.dispatchEvent(
-        new KeyboardEvent("keyup", {
-          key: char,
-          code,
-          keyCode,
-          which: keyCode,
-          bubbles: true
-        })
-      );
-
-      i++;
-      setTimeout(typeChar, 10); // delay giữa từng ký tự
+  console.log('Executing input for text:', text);
+  
+  // Tìm tab active
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs[0];
+    if (!tab?.id) {
+      console.warn('No active tab found');
+      return;
+    }
+    
+    console.log('Found active tab:', tab.id, tab.url);
+    
+    // Kiểm tra nếu tab có content script
+    if (activeTabs.has(tab.id)) {
+      console.log('Tab has content script, sending typeText message');
+      
+      // Gửi message đến content script để gõ text
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'typeText',
+        text: text
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('Error sending message to content script:', chrome.runtime.lastError);
+        } else {
+          console.log('TypeText message sent successfully');
+        }
+      });
     } else {
-      // Gõ xong → Enter
-      const enterEvent = new KeyboardEvent("keydown", {
-        key: "Enter",
-        code: "Enter",
-        keyCode: 13,
-        which: 13,
-        bubbles: true
+      console.log('Tab does not have content script, injecting...');
+      
+      // Inject content script nếu cần
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js']
+      }, () => {
+        // Sau khi inject, gửi message
+        setTimeout(() => {
+          chrome.tabs.sendMessage(tab.id, {
+            action: 'typeText',
+            text: text
+          });
+        }, 500);
       });
-      el.dispatchEvent(enterEvent);
-      el.dispatchEvent(
-        new KeyboardEvent("keyup", {
-          key: "Enter",
-          code: "Enter",
-          keyCode: 13,
-          which: 13,
-          bubbles: true
-        })
-      );
     }
-  }
-
-  typeChar();
-  lockInput = false;
-}
-function excuteInput(text) {
-  setTimeout(() => {
-    try {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const tab = tabs[0]; // tab đang active
-        if (!tab?.id) return;
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: "MAIN",
-          func: typeTextWithDelay,
-          args: [[text]]
-        });
-      });
-      mqttClient.publish(topic + '/reply', JSON.stringify({ message: 'received', epc: messageData.data.epc }));
-    } catch (error) {
-      mqttClient.publish(topic + '/reply', JSON.stringify({ message: 'received', error: error.message }));
-    }
-  }, 500)
+  });
 }
 
 // Kết nối MQTT sử dụng MQTT.js
@@ -262,20 +378,45 @@ function connectMQTT(endpoint, deviceName) {
       });
 
       // Cập nhật badge
-      chrome.action.setBadgeText({ text: 'ON' });
-      chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+      updateBadge('ON', '#4CAF50');
 
       console.log('MQTT connection established successfully');
     });
 
     // Xử lý message nhận được
     mqttClient.on('message', (topic, message) => {
+      console.log('MQTT message received on topic:', topic);
+      
       if (topic === `desktop/device/${currentDeviceName}/receiver`) {
-
-        const messageData = JSON.parse(message.toString());
-        messageQueue.push(messageData.data.epc);
-        if (messageData.data.epc) {
-          excuteInput(messageData.data.epc);
+        try {
+          const messageData = JSON.parse(message.toString());
+          console.log('Parsed message data:', messageData);
+          
+          if (messageData.data && messageData.data.epc) {
+            messageQueue.push(messageData.data.epc);
+            console.log('Added EPC to queue:', messageData.data.epc);
+            
+            // Thực hiện gõ text
+            executeInput(messageData.data.epc);
+            
+            // Gửi reply
+            if (mqttClient && mqttClient.connected) {
+              mqttClient.publish(topic + '/reply', JSON.stringify({ 
+                message: 'received', 
+                epc: messageData.data.epc,
+                timestamp: Date.now()
+              }));
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing MQTT message:', error);
+          if (mqttClient && mqttClient.connected) {
+            mqttClient.publish(topic + '/reply', JSON.stringify({ 
+              message: 'error', 
+              error: error.message,
+              timestamp: Date.now()
+            }));
+          }
         }
       }
     });
@@ -284,38 +425,33 @@ function connectMQTT(endpoint, deviceName) {
     mqttClient.on('error', (error) => {
       console.error('MQTT Error:', error);
       isConnected = false;
-      chrome.action.setBadgeText({ text: 'ERR' });
-      chrome.action.setBadgeBackgroundColor({ color: '#F44336' });
+      updateBadge('ERR', '#F44336');
     });
 
     // Xử lý ngắt kết nối
     mqttClient.on('close', () => {
       console.log('MQTT Connection closed');
       isConnected = false;
-      chrome.action.setBadgeText({ text: 'OFF' });
-      chrome.action.setBadgeBackgroundColor({ color: '#FF9800' });
+      updateBadge('OFF', '#FF9800');
     });
 
     // Xử lý reconnect
     mqttClient.on('reconnect', () => {
       console.log('MQTT Reconnecting...');
-      chrome.action.setBadgeText({ text: 'REC' });
-      chrome.action.setBadgeBackgroundColor({ color: '#FF9800' });
+      updateBadge('REC', '#FF9800');
     });
 
     // Xử lý offline
     mqttClient.on('offline', () => {
       console.log('MQTT Client offline');
       isConnected = false;
-      chrome.action.setBadgeText({ text: 'OFF' });
-      chrome.action.setBadgeBackgroundColor({ color: '#FF9800' });
+      updateBadge('OFF', '#FF9800');
     });
 
   } catch (error) {
     console.error('Failed to connect MQTT:', error);
     isConnected = false;
-    chrome.action.setBadgeText({ text: 'ERR' });
-    chrome.action.setBadgeBackgroundColor({ color: '#F44336' });
+    updateBadge('ERR', '#F44336');
   }
 }
 
@@ -329,8 +465,7 @@ function disconnectMQTT() {
   }
   isConnected = false;
   currentDeviceName = '';
-  chrome.action.setBadgeText({ text: 'OFF' });
-  chrome.action.setBadgeBackgroundColor({ color: '#FF9800' });
+  updateBadge('OFF', '#FF9800');
 
   console.log('MQTT disconnected');
 }
@@ -356,8 +491,37 @@ function loadSettings() {
   });
 }
 
-// Cập nhật badge khi extension khởi động
-chrome.action.setBadgeText({ text: 'OFF' });
-chrome.action.setBadgeBackgroundColor({ color: '#FF9800' });
+// Lắng nghe tab events
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  console.log('Tab activated:', activeInfo.tabId);
+  
+  chrome.tabs.get(activeInfo.tabId, (tab) => {
+    if (tab && tab.url && tab.url.includes('malbon.kiotviet.vn')) {
+      console.log('KiotViet tab activated, checking extension state...');
+      checkExtensionHealth();
+    }
+  });
+});
 
-console.log('MQTT Extension Background Script loaded'); 
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('malbon.kiotviet.vn')) {
+    console.log('KiotViet page loaded completely, checking extension...');
+    
+    // Cập nhật active tabs
+    activeTabs.set(tabId, {
+      url: tab.url,
+      timestamp: Date.now(),
+      active: true
+    });
+    
+    // Kiểm tra health
+    setTimeout(() => {
+      checkExtensionHealth();
+    }, 1000);
+  }
+});
+
+// Cập nhật badge khi extension khởi động
+updateBadge('OFF', '#FF9800');
+
+console.log('MQTT Extension Background Script loaded with improved state management'); 

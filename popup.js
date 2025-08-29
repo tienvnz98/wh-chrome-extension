@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Elements
     const connectBtn = document.getElementById('connectBtn');
     const disconnectBtn = document.getElementById('disconnectBtn');
+    const reloadBtn = document.getElementById('reloadBtn');
     const openDialogBtn = document.getElementById('openDialogBtn');
     const publishBtn = document.getElementById('publishBtn');
     const publishTopic = document.getElementById('publishTopic');
@@ -19,6 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event Listeners
     connectBtn.addEventListener('click', handleConnect);
     disconnectBtn.addEventListener('click', handleDisconnect);
+    reloadBtn.addEventListener('click', handleReload);
     openDialogBtn.addEventListener('click', openSettingsDialog);
     publishBtn.addEventListener('click', handlePublishMessage);
 
@@ -112,6 +114,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 publishBtn.disabled = true;
             }
         });
+    }
+
+    function handleReload() {
+        console.log('Reload button clicked');
+        
+        if (confirm('Bạn có chắc chắn muốn reload extension? Điều này sẽ ngắt kết nối MQTT hiện tại và khởi động lại extension.')) {
+            reloadBtn.disabled = true;
+            reloadBtn.textContent = 'Reloading...';
+            
+            chrome.runtime.sendMessage({
+                action: 'reloadExtension'
+            }, (response) => {
+                console.log('Reload response:', response);
+                
+                if (chrome.runtime.lastError) {
+                    console.error('Runtime error:', chrome.runtime.lastError);
+                    alert('Lỗi reload: ' + chrome.runtime.lastError.message);
+                    reloadBtn.disabled = false;
+                    reloadBtn.textContent = 'Reload Extension';
+                    return;
+                }
+                
+                if (response && response.success) {
+                    console.log('Reload successful');
+                    alert('Extension đã được reload thành công!');
+                    
+                    // Reset UI
+                    setTimeout(() => {
+                        updateConnectionStatus();
+                        reloadBtn.disabled = false;
+                        reloadBtn.textContent = 'Reload Extension';
+                    }, 2000);
+                } else {
+                    console.log('Reload failed');
+                    reloadBtn.disabled = false;
+                    reloadBtn.textContent = 'Reload Extension';
+                }
+            });
+        }
     }
 
     function handlePublishMessage() {

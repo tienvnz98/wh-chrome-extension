@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Extension Reload - KiotViet</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .test-section h3 {
+            color: #666;
+            margin-bottom: 15px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Extension Reload - KiotViet</h1>
+        
+        <div class="test-section">
+            <h3>📝 Test Input Fields</h3>
+            <p>Extension sẽ tự động gõ text vào các ô input khi nhận được MQTT message:</p>
+            <input type="text" id="testInput1" placeholder="Input field 1 - Extension sẽ gõ vào đây" />
+            <input type="text" id="testInput2" placeholder="Input field 2 - Extension sẽ gõ vào đây" />
+            <textarea id="testTextarea" placeholder="Textarea - Extension sẽ gõ vào đây" rows="3"></textarea>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Extension Status</h3>
+            <div id="extensionStatus" class="status info">Checking extension status...</div>
+            <button onclick="checkExtensionStatus()">Check Status</button>
+            <button onclick="reloadExtension()">Reload Extension</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test MQTT Connection</h3>
+            <div id="mqttStatus" class="status info">MQTT status unknown</div>
+            <button onclick="testMQTTConnection()">Test MQTT</button>
+            <button onclick="simulateMQTTMessage()">Simulate MQTT Message</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Activity Log</h3>
+            <div id="activityLog" class="log">
+                <div>🔄 Page loaded at: <span id="loadTime"></span></div>
+                <div>🌐 URL: <span id="currentUrl"></span></div>
+                <div>📱 User Agent: <span id="userAgent"></span></div>
+            </div>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Test Scenarios</h3>
+            <p>Để test extension reload:</p>
+            <ol>
+                <li>Mở extension popup và click "Reload Extension"</li>
+                <li>Chuyển tab và quay lại</li>
+                <li>Refresh trang này</li>
+                <li>Mở tab mới với URL khác rồi quay lại</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Log page load time
+        document.getElementById('loadTime').textContent = new Date().toLocaleString();
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+
+        // Check if extension is available
+        function checkExtensionStatus() {
+            const statusDiv = document.getElementById('extensionStatus');
+            
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({action: 'getStatus'}, (response) => {
+                    if (chrome.runtime.lastError) {
+                        statusDiv.textContent = 'Extension not available: ' + chrome.runtime.lastError.message;
+                        statusDiv.className = 'status error';
+                    } else if (response && response.connected !== undefined) {
+                        statusDiv.textContent = `Extension available. MQTT: ${response.connected ? 'Connected' : 'Disconnected'}`;
+                        statusDiv.className = response.connected ? 'status success' : 'status info';
+                    } else {
+                        statusDiv.textContent = 'Extension available but status unknown';
+                        statusDiv.className = 'status info';
+                    }
+                });
+            } else {
+                statusDiv.textContent = 'Chrome extension API not available';
+                statusDiv.className = 'status error';
+            }
+        }
+
+        // Reload extension
+        function reloadExtension() {
+            const statusDiv = document.getElementById('extensionStatus');
+            statusDiv.textContent = 'Reloading extension...';
+            statusDiv.className = 'status info';
+            
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({action: 'reloadExtension'}, (response) => {
+                    if (chrome.runtime.lastError) {
+                        statusDiv.textContent = 'Reload failed: ' + chrome.runtime.lastError.message;
+                        statusDiv.className = 'status error';
+                    } else if (response && response.success) {
+                        statusDiv.textContent = 'Extension reloaded successfully!';
+                        statusDiv.className = 'status success';
+                        
+                        // Check status after reload
+                        setTimeout(checkExtensionStatus, 3000);
+                    } else {
+                        statusDiv.textContent = 'Reload failed';
+                        statusDiv.className = 'status error';
+                    }
+                });
+            } else {
+                statusDiv.textContent = 'Chrome extension API not available';
+                statusDiv.className = 'status error';
+            }
+        }
+
+        // Test MQTT connection
+        function testMQTTConnection() {
+            const statusDiv = document.getElementById('mqttStatus');
+            statusDiv.textContent = 'Testing MQTT connection...';
+            statusDiv.className = 'status info';
+            
+            // Simulate MQTT test
+            setTimeout(() => {
+                statusDiv.textContent = 'MQTT test completed (simulated)';
+                statusDiv.className = 'status success';
+            }, 2000);
+        }
+
+        // Simulate MQTT message
+        function simulateMQTTMessage() {
+            const statusDiv = document.getElementById('mqttStatus');
+            statusDiv.textContent = 'Simulating MQTT message...';
+            statusDiv.className = 'status info';
+            
+            // Simulate typing text
+            setTimeout(() => {
+                const testInput = document.getElementById('testInput1');
+                if (testInput) {
+                    testInput.focus();
+                    testInput.value = 'Test MQTT message: ' + new Date().toLocaleTimeString();
+                    testInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    
+                    statusDiv.textContent = 'MQTT message simulated - text typed into input field';
+                    statusDiv.className = 'status success';
+                }
+            }, 1000);
+        }
+
+        // Clear log
+        function clearLog() {
+            const logDiv = document.getElementById('activityLog');
+            logDiv.innerHTML = '<div>Log cleared at: ' + new Date().toLocaleTimeString() + '</div>';
+        }
+
+        // Add log entry
+        function addLogEntry(message) {
+            const logDiv = document.getElementById('activityLog');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += '<div>[' + time + '] ' + message + '</div>';
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Listen for page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                addLogEntry('📱 Page became visible');
+                checkExtensionStatus();
+            } else {
+                addLogEntry('👁️ Page hidden');
+            }
+        });
+
+        // Listen for window focus
+        window.addEventListener('focus', () => {
+            addLogEntry('🎯 Window focused');
+        });
+
+        // Listen for window blur
+        window.addEventListener('blur', () => {
+            addLogEntry('💤 Window blurred');
+        });
+
+        // Check extension status on page load
+        window.addEventListener('load', () => {
+            addLogEntry('🚀 Page fully loaded');
+            setTimeout(checkExtensionStatus, 1000);
+        });
+
+        // Check extension status every 10 seconds
+        setInterval(checkExtensionStatus, 10000);
+
+        // Initial status check
+        setTimeout(checkExtensionStatus, 2000);
+    </script>
+</body>
+</html> 

@@ -13,6 +13,10 @@ Một Chrome extension để kết nối và quản lý MQTT broker thông qua W
 - ✅ Console log các message nhận được
 - ✅ Giao diện đẹp và responsive
 - ✅ Sử dụng MQTT.js library chính thức
+- ✅ **Tự động reload extension khi cần thiết**
+- ✅ **Manual reload extension từ popup**
+- ✅ **Theo dõi tab switching và page visibility**
+- ✅ **Health check và auto-recovery**
 
 ## Cài đặt
 
@@ -40,6 +44,27 @@ Một Chrome extension để kết nối và quản lý MQTT broker thông qua W
 - Extension sẽ tự động subscribe vào topic `extension/test/input`
 - Các message nhận được sẽ được log ra console
 - Trạng thái kết nối hiển thị bằng badge và indicator
+- **Extension tự động kiểm tra health và reload khi cần**
+
+### Extension Reload
+Extension có khả năng tự động reload để khắc phục các vấn đề về state:
+
+1. **Tự động reload**: Khi phát hiện state không nhất quán
+2. **Manual reload**: Click nút "Reload Extension" trong popup
+3. **Tab switching detection**: Tự động kiểm tra khi chuyển tab
+4. **Page visibility monitoring**: Theo dõi khi trang trở nên visible
+
+**Khi nào extension tự động reload:**
+- MQTT client state không nhất quán
+- Khi load trang KiotViet (`malbon.kiotviet.vn`)
+- Khi chuyển tab và quay lại
+- Khi page trở nên visible
+
+**Cách manual reload:**
+1. Click icon extension
+2. Click nút "Reload Extension" (màu cam)
+3. Xác nhận reload
+4. Extension sẽ disconnect MQTT và khởi động lại
 
 ## Cấu trúc dự án
 
@@ -102,6 +127,18 @@ Extension sử dụng thư viện **MQTT.js** - thư viện MQTT chính thức c
 - Đảm bảo MQTT.js library tương thích với Chrome extension
 - Có thể cần download MQTT.js mới nhất từ [npm](https://www.npmjs.com/package/mqtt)
 
+### Extension Reload Issues
+- **Extension không tự động reload**: Kiểm tra console log trong background script
+- **Manual reload không hoạt động**: Đảm bảo extension có quyền `scripting` và `tabs`
+- **State vẫn không nhất quán sau reload**: Thử restart Chrome hoặc reinstall extension
+- **Content script không inject**: Kiểm tra manifest.json có đúng content_scripts không
+
+**Debug extension reload:**
+1. Mở `chrome://extensions/`
+2. Click "Details" trên extension
+3. Click "Service Worker" để xem background script console
+4. Kiểm tra log messages về reload
+
 ## Phát triển
 
 Để phát triển thêm tính năng:
@@ -109,6 +146,22 @@ Extension sử dụng thư viện **MQTT.js** - thư viện MQTT chính thức c
 1. Sửa code trong các file tương ứng
 2. Reload extension trong `chrome://extensions/`
 3. Test các thay đổi
+
+### Testing Extension Reload
+Sử dụng file `test-extension-reload.html` để test extension reload:
+
+1. **Mở file test**: `test-extension-reload.html` trong Chrome
+2. **Test manual reload**: Click "Reload Extension" button
+3. **Test tab switching**: Chuyển tab và quay lại
+4. **Test page visibility**: Minimize/maximize window
+5. **Monitor console**: Xem log trong Developer Tools
+
+**Test scenarios:**
+- ✅ Extension reload khi state không nhất quán
+- ✅ Auto-reload khi load trang KiotViet
+- ✅ Tab switching detection
+- ✅ Page visibility monitoring
+- ✅ MQTT message handling sau reload
 
 ### Cập nhật MQTT.js
 Để sử dụng phiên bản MQTT.js mới nhất:
