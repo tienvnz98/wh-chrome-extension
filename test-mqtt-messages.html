@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test MQTT Messages for Chrome Extension</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        .log {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test MQTT Messages for Chrome Extension</h1>
+        <p>Gửi test messages đến các topics mà extension đang subscribe để kiểm tra việc nhận messages.</p>
+        
+        <div class="test-section">
+            <h3>📡 MQTT Broker Connection</h3>
+            <div class="form-group">
+                <label for="brokerUrl">Broker URL:</label>
+                <input type="text" id="brokerUrl" value="ws://localhost:9001" placeholder="ws://localhost:9001">
+            </div>
+            <div class="form-group">
+                <label for="deviceName">Device Name:</label>
+                <input type="text" id="deviceName" value="MyDevice" placeholder="MyDevice">
+            </div>
+            <button onclick="testConnection()">Test Connection</button>
+            <span id="connectionStatus">Not connected</span>
+        </div>
+
+        <div class="test-section">
+            <h3>📤 Send Test Messages</h3>
+            <div class="form-group">
+                <label for="testTopic">Topic:</label>
+                <select id="testTopic">
+                    <option value="extension/test/input">extension/test/input</option>
+                    <option value="desktop/device/MyDevice">desktop/device/MyDevice</option>
+                    <option value="desktop/device/MyDevice/receiver">desktop/device/MyDevice/receiver</option>
+                    <option value="desktop/device/MyDevice/status">desktop/device/MyDevice/status</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="testMessage">Message:</label>
+                <textarea id="testMessage" rows="3" placeholder="Enter your test message here...">Hello from MQTT Test Tool! 🚀</textarea>
+            </div>
+            <button onclick="sendTestMessage()">Send Message</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Quick Test Buttons</h3>
+            <button onclick="sendQuickMessage('extension/test/input', 'Quick test message!')">Test Input</button>
+            <button onclick="sendQuickMessage('desktop/device/MyDevice', 'Device message!')">Device Message</button>
+            <button onclick="sendQuickMessage('desktop/device/MyDevice/receiver', 'Receiver message!')">Receiver Message</button>
+            <button onclick="sendQuickMessage('desktop/device/MyDevice/status', 'Status update!')">Status Update</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Activity Log</h3>
+            <div id="log" class="log"></div>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+    <script>
+        let mqttClient = null;
+        let deviceName = 'MyDevice';
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateDeviceName() {
+            deviceName = document.getElementById('deviceName').value;
+            // Update topic options
+            const topicSelect = document.getElementById('testTopic');
+            topicSelect.options[1].value = `desktop/device/${deviceName}`;
+            topicSelect.options[2].value = `desktop/device/${deviceName}/receiver`;
+            topicSelect.options[3].value = `desktop/device/${deviceName}/status`;
+        }
+
+        function testConnection() {
+            const brokerUrl = document.getElementById('brokerUrl').value;
+            const statusSpan = document.getElementById('connectionStatus');
+            
+            log(`Testing connection to ${brokerUrl}...`);
+            
+            try {
+                if (mqttClient) {
+                    mqttClient.end();
+                }
+                
+                mqttClient = mqtt.connect(brokerUrl, {
+                    clientId: `test_tool_${Date.now()}`,
+                    clean: true,
+                    connectTimeout: 5000
+                });
+
+                mqttClient.on('connect', () => {
+                    log('✅ Connected to MQTT broker successfully!');
+                    statusSpan.textContent = 'Connected';
+                    statusSpan.style.color = 'green';
+                });
+
+                mqttClient.on('error', (error) => {
+                    log(`❌ Connection error: ${error.message}`);
+                    statusSpan.textContent = 'Error';
+                    statusSpan.style.color = 'red';
+                });
+
+                mqttClient.on('close', () => {
+                    log('🔌 Connection closed');
+                    statusSpan.textContent = 'Disconnected';
+                    statusSpan.style.color = 'gray';
+                });
+
+            } catch (error) {
+                log(`❌ Failed to connect: ${error.message}`);
+                statusSpan.textContent = 'Failed';
+                statusSpan.style.color = 'red';
+            }
+        }
+
+        function sendTestMessage() {
+            if (!mqttClient || !mqttClient.connected) {
+                log('❌ Not connected to MQTT broker');
+                return;
+            }
+
+            const topic = document.getElementById('testTopic').value;
+            const message = document.getElementById('testMessage').value;
+            
+            // Replace MyDevice with actual device name
+            const actualTopic = topic.replace('MyDevice', deviceName);
+            
+            log(`📤 Publishing to topic: ${actualTopic}`);
+            log(`📝 Message: ${message}`);
+            
+            mqttClient.publish(actualTopic, message, { qos: 0 }, (error) => {
+                if (error) {
+                    log(`❌ Failed to publish: ${error.message}`);
+                } else {
+                    log(`✅ Message published successfully to ${actualTopic}`);
+                }
+            });
+        }
+
+        function sendQuickMessage(topic, message) {
+            if (!mqttClient || !mqttClient.connected) {
+                log('❌ Not connected to MQTT broker');
+                return;
+            }
+
+            // Replace MyDevice with actual device name
+            const actualTopic = topic.replace('MyDevice', deviceName);
+            
+            log(`📤 Quick publish to: ${actualTopic}`);
+            log(`📝 Message: ${message}`);
+            
+            mqttClient.publish(actualTopic, message, { qos: 0 }, (error) => {
+                if (error) {
+                    log(`❌ Failed to publish: ${error.message}`);
+                } else {
+                    log(`✅ Quick message sent to ${actualTopic}`);
+                }
+            });
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto-update device name when input changes
+        document.getElementById('deviceName').addEventListener('input', updateDeviceName);
+        
+        // Initialize
+        updateDeviceName();
+        log('🚀 MQTT Test Tool loaded. Connect to broker and start testing!');
+    </script>
+</body>
+</html> 

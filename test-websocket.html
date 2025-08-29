@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test WebSocket Connection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Test WebSocket Connection</h1>
+        <p>Test kết nối WebSocket đến MQTT broker trước khi sử dụng extension.</p>
+        
+        <div class="form-group">
+            <label for="endpoint">WebSocket Endpoint:</label>
+            <input type="text" id="endpoint" placeholder="ws://localhost:9001" value="ws://localhost:9001">
+        </div>
+        
+        <div class="form-group">
+            <label for="deviceName">Device Name:</label>
+            <input type="text" id="deviceName" placeholder="TestDevice" value="TestDevice">
+        </div>
+        
+        <button id="testBtn" onclick="testConnection()">Test Connection</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        <button onclick="clearLog()">Clear Log</button>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div class="log">
+            <div id="logContent">
+                <div>Ready to test WebSocket connection...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+
+        function log(message) {
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString();
+            logContent.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('logContent').innerHTML = '<div>Log cleared...</div>';
+        }
+
+        function updateStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+
+        function testConnection() {
+            const endpoint = document.getElementById('endpoint').value.trim();
+            const deviceName = document.getElementById('deviceName').value.trim();
+
+            if (!endpoint || !deviceName) {
+                alert('Vui lòng nhập đầy đủ Endpoint và Device Name!');
+                return;
+            }
+
+            if (!endpoint.startsWith('ws://') && !endpoint.startsWith('wss://')) {
+                alert('Endpoint phải bắt đầu bằng ws:// hoặc wss://');
+                return;
+            }
+
+            log(`Testing connection to: ${endpoint}`);
+            updateStatus('Connecting...', 'connecting');
+
+            const testBtn = document.getElementById('testBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            testBtn.disabled = true;
+            testBtn.textContent = 'Connecting...';
+
+            try {
+                ws = new WebSocket(endpoint);
+
+                ws.onopen = function(event) {
+                    log('✅ WebSocket connection opened successfully');
+                    log(`Connection details: ${JSON.stringify(event, null, 2)}`);
+                    
+                    isConnected = true;
+                    updateStatus('Connected successfully!', 'connected');
+                    
+                    testBtn.textContent = 'Connected';
+                    disconnectBtn.disabled = false;
+                    
+                    // Test MQTT-like packets
+                    setTimeout(() => {
+                        log('📤 Sending test MQTT CONNECT packet...');
+                        const connectPacket = {
+                            type: 'CONNECT',
+                            clientId: `test_${deviceName}_${Date.now()}`,
+                            clean: true,
+                            keepalive: 60
+                        };
+                        ws.send(JSON.stringify(connectPacket));
+                        log(`Sent: ${JSON.stringify(connectPacket)}`);
+                    }, 1000);
+                };
+
+                ws.onmessage = function(event) {
+                    log(`📥 Message received: ${event.data}`);
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`Parsed JSON: ${JSON.stringify(data, null, 2)}`);
+                    } catch (e) {
+                        log(`Raw message (not JSON): ${event.data}`);
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    log(`❌ WebSocket error: ${error}`);
+                    updateStatus('Connection error!', 'error');
+                    testBtn.disabled = false;
+                    testBtn.textContent = 'Test Connection';
+                };
+
+                ws.onclose = function(event) {
+                    log(`🔌 WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`);
+                    isConnected = false;
+                    updateStatus('Disconnected', 'error');
+                    testBtn.disabled = false;
+                    testBtn.textContent = 'Test Connection';
+                    disconnectBtn.disabled = true;
+                };
+
+            } catch (error) {
+                log(`❌ Failed to create WebSocket: ${error.message}`);
+                updateStatus('Failed to create connection!', 'error');
+                testBtn.disabled = false;
+                testBtn.textContent = 'Test Connection';
+            }
+        }
+
+        function disconnect() {
+            if (ws && isConnected) {
+                log('🔌 Disconnecting...');
+                ws.close();
+            }
+        }
+
+        // Auto-test với endpoint mặc định
+        window.onload = function() {
+            log('🚀 WebSocket tester loaded');
+            log('Default endpoint: ws://localhost:9001');
+            log('Make sure your MQTT broker is running with WebSocket support');
+        };
+    </script>
+</body>
+</html> 

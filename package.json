@@ -1,0 +1,20 @@
+{
+  "name": "mqtt-chrome-extension",
+  "version": "1.0.0",
+  "description": "Chrome Extension để kết nối và quản lý MQTT broker",
+  "main": "background.js",
+  "scripts": {
+    "build": "echo 'Extension đã sẵn sàng để load vào Chrome'",
+    "dev": "echo 'Mở chrome://extensions/ và load unpacked'"
+  },
+  "keywords": [
+    "chrome-extension",
+    "mqtt",
+    "websocket",
+    "iot"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
+} 

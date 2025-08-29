@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Extension - Full Settings</title>
+    <link rel="stylesheet" href="settings-dialog.css">
+    <script src="mqtt.min.js"></script>
+</head>
+<body>
+    <div class="dialog-container">
+        <div class="dialog-header">
+            <h1>MQTT Extension Settings</h1>
+            <button id="closeDialog" class="close-btn">&times;</button>
+        </div>
+        
+        <div class="dialog-body">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="connection">Connection</button>
+                <button class="tab-btn" data-tab="general">General</button>
+                <button class="tab-btn" data-tab="advanced">Advanced</button>
+                <button class="tab-btn" data-tab="monitoring">Monitoring</button>
+            </div>
+
+            <!-- Connection Tab -->
+            <div id="connection" class="tab-content active">
+                <div class="form-section">
+                    <h2>Connection Settings</h2>
+                    <div class="form-group">
+                        <label for="mqttEndpoint">MQTT WebSocket Endpoint:</label>
+                        <input type="text" id="mqttEndpoint" placeholder="ws://localhost:9001" />
+                        <small>Ví dụ: ws://localhost:9001 hoặc wss://broker.example.com:9001</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="deviceName">Device Name:</label>
+                        <input type="text" id="deviceName" placeholder="MyDevice" />
+                        <small>Tên thiết bị để định danh (sẽ subscribe desktop/device/{name})</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="username">Username (Optional):</label>
+                        <input type="text" id="username" placeholder="mqtt_user" />
+                        <small>Username cho MQTT broker (nếu cần)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password (Optional):</label>
+                        <input type="password" id="password" placeholder="mqtt_password" />
+                        <small>Password cho MQTT broker (nếu cần)</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- General Tab -->
+            <div id="general" class="tab-content">
+                <div class="form-section">
+                    <h2>General Settings</h2>
+                    <div class="form-group">
+                        <label for="autoConnect">Auto Connect:</label>
+                        <input type="checkbox" id="autoConnect" checked />
+                        <small>Tự động kết nối khi khởi động Chrome và extension</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reconnectInterval">Reconnect Interval (ms):</label>
+                        <input type="number" id="reconnectInterval" value="5000" min="1000" />
+                        <small>Thời gian giữa các lần thử kết nối lại</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="maxReconnectAttempts">Max Reconnect Attempts:</label>
+                        <input type="number" id="maxReconnectAttempts" value="10" min="1" max="100" />
+                        <small>Số lần thử kết nối lại tối đa</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="connectionTimeout">Connection Timeout (ms):</label>
+                        <input type="number" id="connectionTimeout" value="30000" min="5000" />
+                        <small>Thời gian timeout cho kết nối</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Tab -->
+            <div id="advanced" class="tab-content">
+                <div class="form-section">
+                    <h2>Advanced Settings</h2>
+                    <div class="form-group">
+                        <label for="topicPrefix">Topic Prefix:</label>
+                        <input type="text" id="topicPrefix" value="extension" />
+                        <small>Tiền tố cho các topic</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="qosLevel">QoS Level:</label>
+                        <select id="qosLevel">
+                            <option value="0">0 - At most once</option>
+                            <option value="1">1 - At least once</option>
+                            <option value="2">2 - Exactly once</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="keepalive">Keep Alive (seconds):</label>
+                        <input type="number" id="keepalive" value="60" min="10" max="3600" />
+                        <small>Thời gian keep alive cho MQTT connection</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cleanSession">Clean Session:</label>
+                        <input type="checkbox" id="cleanSession" checked />
+                        <small>Bắt đầu session mới mỗi lần kết nối</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monitoring Tab -->
+            <div id="monitoring" class="tab-content">
+                <div class="form-section">
+                    <h2>Monitoring & Logging</h2>
+                    <div class="form-group">
+                        <label for="enableLogging">Enable Console Logging:</label>
+                        <input type="checkbox" id="enableLogging" checked />
+                        <small>Ghi log tất cả MQTT messages vào console</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="logLevel">Log Level:</label>
+                        <select id="logLevel">
+                            <option value="error">Error Only</option>
+                            <option value="warn">Warning & Error</option>
+                            <option value="info" selected>Info, Warning & Error</option>
+                            <option value="debug">Debug (All)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="maxLogEntries">Max Log Entries:</label>
+                        <input type="number" id="maxLogEntries" value="100" min="10" max="1000" />
+                        <small>Số lượng log entries tối đa lưu trữ</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="autoClearLogs">Auto Clear Logs:</label>
+                        <input type="checkbox" id="autoClearLogs" checked />
+                        <small>Tự động xóa logs cũ</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dialog-footer">
+            <button id="saveSettings" class="btn btn-primary">Save Settings</button>
+            <button id="resetSettings" class="btn btn-secondary">Reset to Default</button>
+            <button id="testConnection" class="btn btn-success">Test Connection</button>
+        </div>
+    </div>
+
+    <script src="settings-dialog.js"></script>
+</body>
+</html> 

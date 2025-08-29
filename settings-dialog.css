@@ -1,0 +1,296 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #333;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+.dialog-container {
+    width: 100%;
+    max-width: 1400px;
+    min-height: 800px;
+    margin: 20px auto;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+.dialog-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 40px;
+    text-align: center;
+    position: relative;
+}
+
+.dialog-header h1 {
+    font-size: 48px;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.close-btn {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 48px;
+    cursor: pointer;
+    transition: opacity 0.3s;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    opacity: 0.8;
+}
+
+/* Body */
+.dialog-body {
+    flex: 1;
+    padding: 40px;
+    overflow-y: auto;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    border-bottom: 4px solid #eee;
+    margin-bottom: 40px;
+    gap: 10px;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 20px 30px;
+    cursor: pointer;
+    font-size: 20px;
+    font-weight: 500;
+    color: #666;
+    border-bottom: 4px solid transparent;
+    transition: all 0.3s ease;
+    border-radius: 10px 10px 0 0;
+}
+
+.tab-btn:hover {
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.tab-btn.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Form Sections */
+.form-section {
+    margin-bottom: 40px;
+}
+
+.form-section h2 {
+    font-size: 32px;
+    color: #667eea;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 3px solid #eee;
+}
+
+/* Input fields */
+input[type="text"], input[type="url"], input[type="number"] {
+    width: 33.33%; /* Giảm xuống 1/3 kích thước hiện tại */
+    padding: 4px 8px; /* Giảm padding tương ứng */
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 12px; /* Giảm font size */
+    margin-bottom: 8px;
+}
+
+/* Form groups */
+.form-group {
+    margin-bottom: 8px; /* Giảm margin */
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 2px; /* Giảm margin */
+    font-size: 12px; /* Giảm font size */
+    font-weight: bold;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 18px 20px;
+    border: 3px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 18px;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    transform: translateY(-2px);
+}
+
+.form-group small {
+    display: block;
+    margin-top: 12px;
+    color: #666;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.form-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 15px;
+    transform: scale(1.5);
+    vertical-align: middle;
+}
+
+/* Footer */
+.dialog-footer {
+    padding: 40px;
+    border-top: 3px solid #eee;
+    background: #f8f9fa;
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Buttons */
+.btn {
+    padding: 18px 36px;
+    border: none;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 150px;
+}
+
+.btn-primary {
+    background: #4caf50;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #45a049;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+}
+
+.btn-secondary {
+    background: #ff9800;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #f57c00;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(255, 152, 0, 0.3);
+}
+
+.btn-success {
+    background: #2196f3;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #1976d2;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(33, 150, 243, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .dialog-container {
+        margin: 10px;
+        border-radius: 15px;
+    }
+    
+    .dialog-header {
+        padding: 30px 20px;
+    }
+    
+    .dialog-header h1 {
+        font-size: 36px;
+    }
+    
+    .dialog-body {
+        padding: 30px 20px;
+    }
+    
+    .tabs {
+        flex-wrap: wrap;
+    }
+    
+    .tab-btn {
+        font-size: 18px;
+        padding: 15px 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .dialog-container {
+        margin: 5px;
+        border-radius: 10px;
+    }
+    
+    .dialog-header h1 {
+        font-size: 28px;
+    }
+    
+    .close-btn {
+        font-size: 36px;
+        width: 50px;
+        height: 50px;
+    }
+    
+    .form-section h2 {
+        font-size: 24px;
+    }
+    
+    .form-group label {
+        font-size: 18px;
+    }
+    
+    .btn {
+        padding: 15px 25px;
+        font-size: 16px;
+        min-width: 120px;
+    }
+} 
